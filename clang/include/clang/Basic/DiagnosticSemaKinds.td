@@ -8113,6 +8113,10 @@ let CategoryName = "Lambda Issue" in {
   def warn_cxx17_compat_lambda_def_ctor_assign : Warning<
     "%select{default construction|assignment}0 of lambda is incompatible with "
     "C++ standards before C++20">, InGroup<CXXPre20Compat>, DefaultIgnore;
+
+  // Implicit generalized capture for lambdas
+  def err_implicit_this_capture : Error<
+    "implicit capture of 'this' with a capture default of a custom callable is not allowed">;
 }
 
 def err_return_in_captured_stmt : Error<

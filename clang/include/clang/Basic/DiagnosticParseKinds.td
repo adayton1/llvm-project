@@ -1076,6 +1076,10 @@ def err_static_mutable_lambda : Error<
 def err_static_lambda_captures : Error<
   "a static lambda cannot have any captures">;
 
+// Implicit generalized capture for lambdas
+def ill_formed_default_capture_by_callable : Error<
+  "expected default capture of the form 'default = callable'">;
+
 // Availability attribute
 def err_expected_version : Error<
   "expected a version of the form 'major[.minor[.subminor]]'">;

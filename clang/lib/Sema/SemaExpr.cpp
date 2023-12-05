@@ -19549,7 +19549,17 @@ static bool captureInLambda(LambdaScopeInfo *LSI, ValueDecl *Var,
   }
 
   // Compute the type of the field that will capture this variable.
-  if (ByRef) {
+  if (LSI->ImpCaptureStyle == LambdaScopeInfo::ImpCap_LambdaByCallable) {
+     Expr *E = DeclRefExpr::Create(S.Context, NestedNameSpecifierLoc(), Loc,
+                                   Var, false, Loc, CaptureType, VK_LValue);
+     MultiExprArg arg(&E, 1);
+     ExprResult CaptureInit = S.ActOnCallExpr(S.getCurScope(),
+                                              LSI->DefaultCallable.get(),
+                                              Loc, arg, Loc);
+     CaptureType = CaptureInit.get()->getType();
+     ByRef = CaptureType->isReferenceType();
+  }
+  else if (ByRef) {
     // C++11 [expr.prim.lambda]p15:
     //   An entity is captured by reference if it is implicitly or
     //   explicitly captured but not captured by copy. It is

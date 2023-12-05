@@ -2149,7 +2149,13 @@ void StmtPrinter::VisitLambdaExpr(LambdaExpr *Node) {
     OS << '&';
     NeedComma = true;
     break;
+
+  case LCD_ByCallable:
+    OS << "default = "; // TODO: Print callable
+    NeedComma = true;
+    break;
   }
+
   for (LambdaExpr::capture_iterator C = Node->explicit_capture_begin(),
                                  CEnd = Node->explicit_capture_end();
        C != CEnd;

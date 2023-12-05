@@ -15478,6 +15478,9 @@ LambdaScopeInfo *Sema::RebuildLambdaScopeInfo(CXXMethodDecl *CallOperator) {
     LSI->ImpCaptureStyle = CapturingScopeInfo::ImpCap_LambdaByval;
   else if (LCD == LCD_ByRef)
     LSI->ImpCaptureStyle = CapturingScopeInfo::ImpCap_LambdaByref;
+  else if (LCD == LCD_ByCallable)
+    LSI->ImpCaptureStyle = CapturingScopeInfo::ImpCap_LambdaByCallable;
+
   DeclarationNameInfo DNI = CallOperator->getNameInfo();
 
   LSI->IntroducerRange = DNI.getCXXOperatorNameRange();

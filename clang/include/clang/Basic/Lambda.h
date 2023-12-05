@@ -22,7 +22,8 @@ namespace clang {
 enum LambdaCaptureDefault {
   LCD_None,
   LCD_ByCopy,
-  LCD_ByRef
+  LCD_ByRef,
+  LCD_ByCallable
 };
 
 /// The different capture forms in a lambda introducer
