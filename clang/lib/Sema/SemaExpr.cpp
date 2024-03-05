@@ -19551,13 +19551,13 @@ static bool captureInLambda(LambdaScopeInfo *LSI, ValueDecl *Var,
   // Compute the type of the field that will capture this variable.
   if (LSI->ImpCaptureStyle == LambdaScopeInfo::ImpCap_LambdaByCallable) {
      Expr *E = DeclRefExpr::Create(S.Context, NestedNameSpecifierLoc(), Loc,
-                                   Var, false, Loc, CaptureType, VK_LValue);
+                                   Var, false, Loc, DeclRefType, VK_LValue);
      MultiExprArg arg(&E, 1);
      ExprResult CaptureInit = S.ActOnCallExpr(S.getCurScope(),
                                               LSI->DefaultCallable.get(),
                                               Loc, arg, Loc);
      CaptureType = CaptureInit.get()->getType();
-     ByRef = CaptureType->isReferenceType();
+     ByRef = CaptureType->isLValueReferenceType();
   }
   else if (ByRef) {
     // C++11 [expr.prim.lambda]p15:

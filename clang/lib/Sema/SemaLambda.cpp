@@ -1878,7 +1878,7 @@ ExprResult Sema::BuildCaptureInit(const Capture &Cap,
 
     if (DefaultCallable.get() != nullptr) {
       Expr *E = DeclRefExpr::Create(Context, NestedNameSpecifierLoc(), Loc,
-                                    Var, false, Loc, Var->getType(), VK_LValue);
+                                    Var, false, Loc, Var->getType().getNonReferenceType(), VK_LValue);
       MultiExprArg arg(&E, 1);
       Init = ActOnCallExpr(getCurScope(), DefaultCallable.get(),
                            Loc, arg, Loc);
