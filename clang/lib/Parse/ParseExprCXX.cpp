@@ -873,6 +873,26 @@ bool Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
     Intro.DefaultLoc = ConsumeToken();
     First = false;
     Tentative = nullptr;
+  } else if (Tok.is(tok::kw_default)) {
+    Intro.Default = LCD_ByCallable;
+    Intro.DefaultLoc = ConsumeToken(); // 'default'
+
+    if (Tok.isNot(tok::equal)) {
+      return Invalid(
+          [&] { Diag(Tok.getLocation(), diag::ill_formed_default_capture_by_callable); });
+    }
+
+    ConsumeToken(); // '='
+    Intro.DefaultCallable = ParseExpression(); // callable
+
+    if (!Intro.DefaultCallable.isUsable()) {
+      return Invalid([&] {
+        Diag(Tok.getLocation(), diag::err_expected_expression);
+      });
+    }
+
+    First = false;
+    Tentative = nullptr; // Is this guaranteed to be a lambda expression?
   }
 
   while (Tok.isNot(tok::r_square)) {
@@ -933,9 +953,10 @@ bool Parser::ParseLambdaIntroducer(LambdaIntroducer &Intro,
     } else if (Tok.is(tok::kw_this)) {
       Kind = LCK_This;
       Loc = ConsumeToken();
-    } else if (Tok.isOneOf(tok::amp, tok::equal) &&
-               NextToken().isOneOf(tok::comma, tok::r_square) &&
-               Intro.Default == LCD_None) {
+    } else if (Intro.Default == LCD_None &&
+               (Tok.is(tok::kw_default) ||
+               (Tok.isOneOf(tok::amp, tok::equal) &&
+                NextToken().isOneOf(tok::comma, tok::r_square)))) {
       // We have a lone "&" or "=" which is either a misplaced capture-default
       // or the start of a capture (in the "&" case) with the rest of the
       // capture missing. Both are an error but a misplaced capture-default

@@ -684,8 +684,8 @@ protected:
 
 public:
   enum ImplicitCaptureStyle {
-    ImpCap_None, ImpCap_LambdaByval, ImpCap_LambdaByref, ImpCap_Block,
-    ImpCap_CapturedRegion
+    ImpCap_None, ImpCap_LambdaByval, ImpCap_LambdaByref, ImpCap_LambdaByCallable,
+    ImpCap_Block, ImpCap_CapturedRegion
   };
 
   ImplicitCaptureStyle ImpCaptureStyle;
@@ -863,6 +863,9 @@ public:
   /// Source location of the '&' or '=' specifying the default capture
   /// type, if any.
   SourceLocation CaptureDefaultLoc;
+
+  /// For implicit generalized captures
+  ExprResult DefaultCallable;
 
   /// The number of captures in the \c Captures list that are
   /// explicit captures.

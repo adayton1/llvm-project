@@ -485,10 +485,14 @@ void Sema::buildLambdaScope(LambdaScopeInfo *LSI, CXXMethodDecl *CallOperator,
   LSI->CallOperator = CallOperator;
   CXXRecordDecl *LambdaClass = CallOperator->getParent();
   LSI->Lambda = LambdaClass;
+
   if (CaptureDefault == LCD_ByCopy)
     LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByval;
   else if (CaptureDefault == LCD_ByRef)
     LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByref;
+  else if (CaptureDefault == LCD_ByCallable)
+    LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByCallable;
+
   LSI->CaptureDefaultLoc = CaptureDefaultLoc;
   LSI->IntroducerRange = IntroducerRange;
   LSI->ExplicitParams = ExplicitParams;
@@ -1024,7 +1028,11 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
     LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByval;
   else if (Intro.Default == LCD_ByRef)
     LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByref;
+  else if (Intro.Default == LCD_ByCallable)
+    LSI->ImpCaptureStyle = LambdaScopeInfo::ImpCap_LambdaByCallable;
+
   LSI->CaptureDefaultLoc = Intro.DefaultLoc;
+  LSI->DefaultCallable = Intro.DefaultCallable;
   LSI->IntroducerRange = Intro.Range;
   LSI->AfterParameterList = false;
 
@@ -1128,6 +1136,9 @@ void Sema::ActOnLambdaExpressionAfterIntroducer(LambdaIntroducer &Intro,
       // in this case.
       if (C->InitCaptureType.get().isNull())
         continue;
+
+      // FIXME: If possible, warn if the initializer expression is the same
+      //        as the default callable for implicit generalized captures.
 
       if (C->Init.get()->containsUnexpandedParameterPack() &&
           !C->InitCaptureType.get()->getAs<PackExpansionType>())
@@ -1823,6 +1834,7 @@ static void addBlockPointerConversion(Sema &S,
 
 ExprResult Sema::BuildCaptureInit(const Capture &Cap,
                                   SourceLocation ImplicitCaptureLoc,
+                                  ExprResult DefaultCallable,
                                   bool IsOpenMPMapping) {
   // VLA captures don't have a stored initialization expression.
   if (Cap.isVLATypeCapture())
@@ -1863,8 +1875,18 @@ ExprResult Sema::BuildCaptureInit(const Capture &Cap,
     assert(Cap.isVariableCapture() && "unknown kind of capture");
     ValueDecl *Var = Cap.getVariable();
     Name = Var->getIdentifier();
-    Init = BuildDeclarationNameExpr(
-      CXXScopeSpec(), DeclarationNameInfo(Var->getDeclName(), Loc), Var);
+
+    if (DefaultCallable.get() != nullptr) {
+      Expr *E = DeclRefExpr::Create(Context, NestedNameSpecifierLoc(), Loc,
+                                    Var, false, Loc, Var->getType().getNonReferenceType(), VK_LValue);
+      MultiExprArg arg(&E, 1);
+      Init = ActOnCallExpr(getCurScope(), DefaultCallable.get(),
+                           Loc, arg, Loc);
+    }
+    else {
+      Init = BuildDeclarationNameExpr(
+        CXXScopeSpec(), DeclarationNameInfo(Var->getDeclName(), Loc), Var);
+    }
   }
 
   // In OpenMP, the capture kind doesn't actually describe how to capture:
@@ -1902,6 +1924,8 @@ mapImplicitCaptureStyle(CapturingScopeInfo::ImplicitCaptureStyle ICS) {
   case CapturingScopeInfo::ImpCap_CapturedRegion:
   case CapturingScopeInfo::ImpCap_LambdaByref:
     return LCD_ByRef;
+  case CapturingScopeInfo::ImpCap_LambdaByCallable:
+    return LCD_ByCallable;
   case CapturingScopeInfo::ImpCap_Block:
     llvm_unreachable("block capture in lambda");
   }
@@ -2050,6 +2074,8 @@ ExprResult Sema::BuildLambdaExpr(SourceLocation StartLoc, SourceLocation EndLoc,
     SourceLocation PrevCaptureLoc = CurHasPreviousCapture ?
         CaptureDefaultLoc : IntroducerRange.getBegin();
 
+    ExprResult DefaultCallable = LSI->DefaultCallable;
+
     for (unsigned I = 0, N = LSI->Captures.size(); I != N; ++I) {
       const Capture &From = LSI->Captures[I];
 
@@ -2110,6 +2136,12 @@ ExprResult Sema::BuildLambdaExpr(SourceLocation StartLoc, SourceLocation EndLoc,
                 << FixItHint::CreateInsertion(
                        getLocForEndOfToken(CaptureDefaultLoc), ", this");
           }
+
+          if (IsImplicit && CaptureDefault == LCD_ByCallable) {
+            // FIXME: Implicitly capturing 'this' by callable should be considered
+            Diag(From.getLocation(), diag::err_implicit_this_capture);
+          }
+
           return LambdaCapture(From.getLocation(), IsImplicit,
                                From.isCopyCapture() ? LCK_StarThis : LCK_This);
         } else if (From.isVLATypeCapture()) {
@@ -2125,7 +2157,7 @@ ExprResult Sema::BuildLambdaExpr(SourceLocation StartLoc, SourceLocation EndLoc,
       }();
 
       // Form the initializer for the capture field.
-      ExprResult Init = BuildCaptureInit(From, ImplicitCaptureLoc);
+      ExprResult Init = BuildCaptureInit(From, ImplicitCaptureLoc, DefaultCallable);
 
       // FIXME: Skip this capture if the capture is not used, the initializer
       // has no side-effects, the type of the capture is trivial, and the
